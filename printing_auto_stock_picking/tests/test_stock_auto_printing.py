@@ -1,17 +1,26 @@
-import logging
+# Copyright 2022 Jacques-Etienne Baudoux (BCIM) <je@bcim.be>
+# Copyright 2022 Michael Tietz (MT Software) <mtietz@mt-software.de>
+# License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from odoo.exceptions import UserError
+import base64
+from unittest import mock
+
 from odoo.tests import common
 
-logger = logging.getLogger(__name__)
+from odoo.addons.base_report_to_printer.models.printing_printer import PrintingPrinter
 
 
+def print_document(self, *args, **kwargs):
+    return
+
+
+@mock.patch.object(PrintingPrinter, "print_document", print_document)
 class TestAutoPrinting(common.SavepointCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+
         cls.server = cls.env["printing.server"].create({})
-        cls.stock_picking = cls.env.ref("stock.outgoing_shipment_main_warehouse")
         cls.printer_1 = cls.env["printing.printer"].create(
             {
                 "name": "Printer",
@@ -25,34 +34,6 @@ class TestAutoPrinting(common.SavepointCase):
                 "uri": "URI",
             }
         )
-        cls.report = cls.env.ref("stock.action_report_delivery")
-        cls.auto_printing = cls.env["printing.auto"].create(
-            {
-                "name": "Auto Printing 1",
-                "picking_type_id": cls.stock_picking.picking_type_id.id,
-                "report_id": cls.report.id,
-                "printer_id": cls.printer_1.id,
-            }
-        )
-        cls.auto_printing_2 = cls.env["printing.auto"].create(
-            {
-                "name": "Auto Printing 2",
-                "picking_type_id": cls.stock_picking.picking_type_id.id,
-                "printer_id": cls.printer_1.id,
-                "file_type": "attachment",
-            }
-        )
-        cls.report_datas, a = cls.report.with_context(
-            must_skip_send_to_printer=True,
-        )._render_qweb_pdf(cls.stock_picking.id)
-        cls.attachment_1 = cls.env["ir.attachment"].create(
-            {
-                "name": "attachment_1.pdf",
-                "res_model": "stock.picking",
-                "res_id": cls.stock_picking.id,
-                "raw": cls.report_datas,
-            }
-        )
         cls.tray = cls.env["printing.tray"].create(
             {
                 "name": "Tray",
@@ -61,17 +42,47 @@ class TestAutoPrinting(common.SavepointCase):
             }
         )
 
+        cls.report = cls.env.ref("stock.action_report_delivery")
+        cls.auto_printing = cls.env["printing.auto"].create(
+            {
+                "name": "Auto Printing 1",
+                "report_id": cls.report.id,
+                "printer_id": cls.printer_1.id,
+            }
+        )
+        cls.auto_printing_2 = cls.env["printing.auto"].create(
+            {
+                "name": "Auto Printing 2",
+                "printer_id": cls.printer_1.id,
+                "file_type": "attachment",
+            }
+        )
+        cls.stock_picking = cls.env.ref("stock.outgoing_shipment_main_warehouse")
+        cls.stock_picking.picking_type_id.auto_printing_ids |= (
+            cls.auto_printing | cls.auto_printing_2
+        )
+
+        cls.report_datas, a = cls.report.with_context(
+            must_skip_send_to_printer=True,
+        )._render_qweb_pdf(cls.stock_picking.id)
+
+        cls.attachment_1 = cls.env["ir.attachment"].create(
+            {
+                "name": "attachment_1.pdf",
+                "res_model": "stock.picking",
+                "res_id": cls.stock_picking.id,
+                "raw": cls.report_datas,
+            }
+        )
+
     def test_00_test_general(self):
-        with self.assertRaises(UserError):
-            self.stock_picking.send_documents_to_printer()
+        self.stock_picking.send_documents_to_printer()
 
     def test_10_test_print_report(self):
-        with self.assertRaises(UserError):
-            self.auto_printing.do_print(self.stock_picking)
+        self.auto_printing.do_print(self.stock_picking)
 
     def test_20_test_print_attachment(self):
-        with self.assertRaises(UserError):
-            self.auto_printing_2.do_print(self.stock_picking)
+        self.auto_printing_2.do_print(self.stock_picking)
 
     def test_30_test_condition_filter(self):
         self.auto_printing.condition = [("id", "=", self.stock_picking.id)]
@@ -79,7 +90,7 @@ class TestAutoPrinting(common.SavepointCase):
         self.assertEqual(auto_printing, self.stock_picking)
 
         self.auto_printing.condition = [("id", "=", 0)]
-        auto_printing = self.auto_printing.check_condition(self.stock_picking)
+        auto_printing = self.auto_printing._check_condition(self.stock_picking)
         self.assertEqual(len(auto_printing), 0)
 
     def test_40_test_attachment_filter(self):
@@ -96,7 +107,7 @@ class TestAutoPrinting(common.SavepointCase):
             self.stock_picking
         )
         self.assertEqual(len(test_attachment), 1)
-        self.assertEqual(self.report_datas, test_attachment[0])
+        self.assertEqual(base64.b64decode(self.report_datas), test_attachment[0])
 
     def test_50_test_field_object(self):
         self.auto_printing.field_object = "picking_type_id"
@@ -136,7 +147,7 @@ class TestAutoPrinting(common.SavepointCase):
 
     def test_60_output(self):
         # Report
-        for content in self.auto_printing.get_content(self.stock_picking):
+        for content in self.auto_printing._get_content(self.stock_picking):
             self.assertTrue(self._check_pdf(content))
 
         # Attachments
@@ -155,7 +166,7 @@ class TestAutoPrinting(common.SavepointCase):
                 }
             )
         self.auto_printing_2.attachment_domain = [("name", "in", attachment_names)]
-        contents = self.auto_printing_2.get_content(self.stock_picking)
+        contents = self.auto_printing_2._get_content(self.stock_picking)
         self.assertEqual(len(contents), attachment_len)
         for content in contents:
             self.assertTrue(self._check_pdf(content))

@@ -3,7 +3,8 @@
 
 {
     "application": False,
-    "author": "BCIM, Odoo Community Association (OCA)",
+    "author": "BCIM, Michael Tietz (MT Software) <mtietz@mt-software.de>, "
+    "Odoo Community Association (OCA)",
     "category": "Warehouse Management",
     "data": [
         "security/ir.model.access.csv",

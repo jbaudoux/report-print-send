@@ -1,4 +1,5 @@
 # Copyright 2022 Jacques-Etienne Baudoux (BCIM) <je@bcim.be>
+# Copyright 2022 Michael Tietz (MT Software) <mtietz@mt-software.de>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 import base64
@@ -53,9 +54,9 @@ class PrintingAuto(models.Model):
             if rec.file_type == "report" and not rec.report_id:
                 raise UserError(_("Report was not set"))
 
-    def do_print(self, picking):
+    def do_print(self, record):
         self.ensure_one()
-        picking.ensure_one()
+        record.ensure_one()
 
         behaviour = self.get_behaviour()
         printer = behaviour["printer"]
@@ -66,12 +67,12 @@ class PrintingAuto(models.Model):
 
         if self.nbr_of_copies <= 0:
             return (printer, 0)
-        if not self._check_condition(picking):
+        if not self._check_condition(record):
             return (printer, 0)
 
         count = 0
-        record = self._get_record(picking)
-        for content in self.get_content(record):
+        record = self._get_record(record)
+        for content in self._get_content(record):
             for _n in range(self.nbr_of_copies):
                 printer.print_document(report=None, content=content, **behaviour)
                 count += 1
@@ -97,11 +98,11 @@ class PrintingAuto(models.Model):
                 ) from e
         return record
 
-    def _check_condition(self, picking):
+    def _check_condition(self, record):
         domain = safe_eval(self.condition, {"env": self.env})
-        return picking.filtered_domain(domain)
+        return record.filtered_domain(domain)
 
-    def get_content(self, record):
+    def _get_content(self, record):
         if self.file_type == "report":
             return [self.generate_data_from_report(record)]
         if self.file_type == "attachment":
