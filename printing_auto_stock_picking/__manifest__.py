@@ -2,7 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 {
-    "application": False,
+    "name": "printing_auto_stock_picking",
     "author": "BCIM, MT Software, Odoo Community Association (OCA)",
     "category": "Warehouse Management",
     "data": [
@@ -10,14 +10,11 @@
         "views/stock_picking.xml",
         "views/stock_picking_type.xml",
     ],
-    "demo_xml": [],
     "depends": [
         "stock",
         "printing_auto_base",
     ],
-    "installable": True,
     "license": "AGPL-3",
-    "name": "printing_auto_stock_picking",
     "version": "14.0.1.0.0",
     "website": "https://github.com/OCA/report-print-send",
 }

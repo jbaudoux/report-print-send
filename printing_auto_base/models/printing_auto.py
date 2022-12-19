@@ -15,12 +15,13 @@ class PrintingAuto(models.Model):
     _description = "Printing Auto"
 
     name = fields.Char(string="Name", required=True)
-    file_type = fields.Selection(
+
+    data_source = fields.Selection(
         [
             ("report", "Report"),
             ("attachment", "Attachment"),
         ],
-        string="Type",
+        string="Data source",
         default="report",
         required=True,
         help=(
@@ -29,36 +30,95 @@ class PrintingAuto(models.Model):
             "recorded on the picking as an attachment)"
         ),
     )
-    field_object = fields.Char(
-        "Object", help="Select on which document the report must be executed"
-    )
-
     report_id = fields.Many2one("ir.actions.report")
+    attachment_domain = fields.Char("Attachment domain", default="[]")
 
-    attachment_domain = fields.Char("Attachment", default="[]")
     condition = fields.Char(
         "Condition",
         default="[]",
         help="Give a domain that must be valid for printing this",
     )
+    record_change = fields.Char(
+        "Record change", help="Select on which document the report must be executed"
+    )
 
-    printer_id = fields.Many2one("printing.printer", string="Printer")
-    printer_tray_id = fields.Many2one("printing.tray")
+    printer_id = fields.Many2one("printing.printer", "Printer")
+    printer_tray_id = fields.Many2one("printing.tray", "Tray")
     nbr_of_copies = fields.Integer("Number of Copies", default=1)
+    is_label = fields.Boolean("Is Label")
 
-    label = fields.Boolean(string="Is Label")
-
-    @api.constrains("report_id", "file_type")
-    def check_report(self):
+    @api.constrains("data_source", "report_id", "attachment_domain")
+    def _check_data_source(self):
         for rec in self:
-            if rec.file_type == "report" and not rec.report_id:
-                raise UserError(_("Report was not set"))
+            if rec.data_source == "report" and not rec.report_id:
+                raise UserError(_("Report is not set"))
+            if rec.data_source == "attachment" and (
+                not rec.attachment_domain or rec.attachment_domain == "[]"
+            ):
+                raise UserError(_("Attachment domain is not set"))
+
+    def _get_behaviour(self):
+        if self.printer_id:
+            result = {"printer": self.printer_id}
+            if self.printer_tray_id:
+                result["tray"] = self.printer_tray_id.system_name
+            return result
+        if self.data_source == "report":
+            return self.report_id.behaviour()
+        if self.is_label:
+            return {"printer": self.env.user.default_label_printer_id}
+        return self.env["ir.actions.report"]._get_user_default_print_behaviour()
+
+    def _get_record(self, record):
+        if self.record_change:
+            try:
+                return safe_eval(f"obj.{self.record_change}", {"obj": record})
+            except Exception as e:
+                raise ValidationError(
+                    _("The Record change could not be applied because: %s") % str(e)
+                ) from e
+        return record
+
+    def _check_condition(self, record):
+        domain = safe_eval(self.condition, {"env": self.env})
+        return record.filtered_domain(domain)
+
+    def _get_content(self, record):
+        generate_data_func = getattr(
+            self, f"_generate_data_from_{self.data_source}", None
+        )
+        if generate_data_func:
+            record = self._get_record(record)
+            return generate_data_func(record)
+        return []
+
+    def _prepare_attachment_domain(self, record):
+        domain = safe_eval(self.attachment_domain)
+        record_domain = [
+            ("res_id", "=", record.id),
+            ("res_model", "=", record._name),
+        ]
+        return expression.AND([domain, record_domain])
+
+    def _generate_data_from_attachment(self, record):
+        domain = self._prepare_attachment_domain(record)
+        attachments = self.env["ir.attachment"].search(domain)
+        if not attachments:
+            raise ValidationError(_("No attachment was found."))
+        return [base64.b64decode(a.datas) for a in attachments]
+
+    def _generate_data_from_report(self, record):
+        self.ensure_one()
+        data, _ = self.report_id.with_context(must_skip_send_to_printer=True)._render(
+            record.id
+        )
+        return [data]
 
     def do_print(self, record):
         self.ensure_one()
         record.ensure_one()
 
-        behaviour = self.get_behaviour()
+        behaviour = self._get_behaviour()
         printer = behaviour["printer"]
         if not printer:
             raise UserError(
@@ -71,62 +131,8 @@ class PrintingAuto(models.Model):
             return (printer, 0)
 
         count = 0
-        record = self._get_record(record)
         for content in self._get_content(record):
             for _n in range(self.nbr_of_copies):
                 printer.print_document(report=None, content=content, **behaviour)
                 count += 1
         return (printer, count)
-
-    def get_behaviour(self):
-        if self.printer_id:
-            tray = self.printer_tray_id and self.printer_tray_id.system_name
-            return {"printer": self.printer_id, "tray": tray}
-        if self.file_type == "report":
-            return self.report_id.behaviour()
-        if self.label:
-            return {"printer": self.env.user.default_label_printer_id}
-        return self.env["ir.actions.report"]._get_user_default_print_behaviour()
-
-    def _get_record(self, record):
-        if self.field_object:
-            try:
-                return safe_eval(f"obj.{self.field_object}", {"obj": record})
-            except Exception as e:
-                raise ValidationError(
-                    _("The Object field could not be applied because: %s") % str(e)
-                ) from e
-        return record
-
-    def _check_condition(self, record):
-        domain = safe_eval(self.condition, {"env": self.env})
-        return record.filtered_domain(domain)
-
-    def _get_content(self, record):
-        if self.file_type == "report":
-            return [self.generate_data_from_report(record)]
-        if self.file_type == "attachment":
-            return self.generate_data_from_attachments(record)
-        return []
-
-    def _prepare_attachment_domain(self, record):
-        domain = safe_eval(self.attachment_domain)
-        record_domain = [
-            ("res_id", "=", record.id),
-            ("res_model", "=", record._name),
-        ]
-        return expression.AND([domain, record_domain])
-
-    def generate_data_from_attachments(self, record):
-        domain = self._prepare_attachment_domain(record)
-        attachments = self.env["ir.attachment"].search(domain)
-        if not attachments:
-            raise ValidationError(_("No attachment was found."))
-        return [base64.b64decode(a.datas) for a in attachments]
-
-    def generate_data_from_report(self, record):
-        self.ensure_one()
-        data, _ = self.report_id.with_context(
-            must_skip_send_to_printer=True
-        )._render_qweb_pdf(record.id)
-        return data

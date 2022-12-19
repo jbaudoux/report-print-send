@@ -1,1 +1,1 @@
-from . import test_stock_auto_printing
+from . import test_printing_auto_stock

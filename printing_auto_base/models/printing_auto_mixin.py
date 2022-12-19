@@ -12,6 +12,9 @@ class PrintingAutoMixin(models.AbstractModel):
     _name = "printing.auto.mixin"
     _description = "Printing Auto Mixin"
 
+    auto_printing_ids = fields.Many2many(
+        "printing.auto", string="Auto Printing Configuration"
+    )
     printing_auto_error = fields.Text("Printing error")
 
     def _on_printing_auto_start(self):
@@ -31,20 +34,28 @@ class PrintingAutoMixin(models.AbstractModel):
     def _on_printing_auto_error(self, e):
         self.write({"printing_auto_error": str(e)})
 
-    def send_documents_to_printer(self):
+    def _get_printing_auto(self):
+        return self.auto_printing_ids
+
+    def _handle_print_auto(self, printing_auto):
+        self.ensure_one()
+        printing_auto.ensure_one()
+        try:
+            with self.env.cr.savepoint():
+                printer, count = printing_auto.do_print(self)
+                if count:
+                    self._on_printing_auto_done(printing_auto, printer, count)
+        except Exception as e:
+            _logger.exception(
+                "An error occurred while printing '%s' for record %s.",
+                printing_auto,
+                self,
+            )
+            self._on_printing_auto_error(e)
+
+    def handle_print_auto(self):
         """Print some report or attachment directly to the corresponding printer."""
         self._on_printing_auto_start()
         for record in self:
-            for auto in record.auto_printing_ids:
-                try:
-                    with self.env.cr.savepoint():
-                        printer, count = auto.do_print(record)
-                        if count:
-                            record._on_printing_auto_done(auto, printer, count)
-                except Exception as e:
-                    _logger.exception(
-                        "An error occurred while printing '%s' for record %s.",
-                        auto,
-                        record,
-                    )
-                    record._on_printing_auto_error(e)
+            for printing_auto in record._get_printing_auto():
+                record._handle_print_auto(printing_auto)
