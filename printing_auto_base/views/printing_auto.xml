@@ -7,19 +7,19 @@
                 <sheet>
                     <group>
                         <field name="name" />
-                        <field name="file_type" />
-                        <field name="field_object" />
+                        <field name="data_source" />
+                        <field name="record_change" />
                         <field
                             name="report_id"
-                            attrs="{'invisible':[('file_type', '=', 'attachment')]}"
+                            attrs="{'invisible':[('data_source', '=', 'attachment')]}"
                         />
                         <field
                             name="attachment_domain"
-                            attrs="{'invisible':[('file_type', '=', 'report')]}"
+                            attrs="{'invisible':[('data_source', '=', 'report')]}"
                         />
                         <field
-                            name="label"
-                            attrs="{'invisible':[('file_type', '=', 'report')]}"
+                            name="is_label"
+                            attrs="{'invisible':[('data_source', '=', 'report')]}"
                         />
                         <field name="condition" />
                         <field name="printer_id" />
@@ -40,15 +40,15 @@
         <field name="arch" type="xml">
             <tree>
                 <field name="name" />
-                <field name="file_type" />
-                <field name="field_object" />
+                <field name="data_source" />
+                <field name="record_change" />
                 <field name="report_id" />
                 <field name="attachment_domain" />
                 <field name="condition" />
                 <field name="printer_id" />
                 <field name="printer_tray_id" />
                 <field name="nbr_of_copies" />
-                <field name="label" />
+                <field name="is_label" />
             </tree>
         </field>
     </record>

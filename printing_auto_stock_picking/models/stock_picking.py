@@ -15,5 +15,5 @@ class StockPicking(models.Model):
 
     def _action_done(self):
         result = super()._action_done()
-        self.send_documents_to_printer()
+        self.handle_print_auto()
         return result

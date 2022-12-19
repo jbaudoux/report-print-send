@@ -20,7 +20,7 @@
 
       <header position="inside">
         <button
-                    name="send_documents_to_printer"
+                    name="handle_print_auto"
                     type="object"
                     string="Print documents"
                     states="done"
