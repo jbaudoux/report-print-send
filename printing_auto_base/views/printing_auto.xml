@@ -17,10 +17,6 @@
                             name="attachment_domain"
                             attrs="{'invisible':[('data_source', '=', 'report')]}"
                         />
-                        <field
-                            name="is_label"
-                            attrs="{'invisible':[('data_source', '=', 'report')]}"
-                        />
                         <field name="condition" />
                         <field name="printer_id" />
                         <field
@@ -48,7 +44,6 @@
                 <field name="printer_id" />
                 <field name="printer_tray_id" />
                 <field name="nbr_of_copies" />
-                <field name="is_label" />
             </tree>
         </field>
     </record>

@@ -38,13 +38,8 @@ class TestPrintingAutoBase(TestPrintingAutoCommon):
         printing_auto.printer_tray_id = False
         self.assertEqual(expected, printing_auto._get_behaviour())
 
-        self.env.user.default_label_printer_id = self.printer_2
-        expected = {"printer": self.printer_2}
-        printing_auto = self._create_printing_auto_attachment({"is_label": True})
-        self.assertEqual(expected, printing_auto._get_behaviour())
-
         expected = self.env["ir.actions.report"]._get_user_default_print_behaviour()
-        printing_auto.is_label = False
+        printing_auto = self._create_printing_auto_attachment()
         self.assertEqual(expected, printing_auto._get_behaviour())
 
     def test_record_change(self):

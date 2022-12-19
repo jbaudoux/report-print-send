@@ -45,7 +45,6 @@ class PrintingAuto(models.Model):
     printer_id = fields.Many2one("printing.printer", "Printer")
     printer_tray_id = fields.Many2one("printing.tray", "Tray")
     nbr_of_copies = fields.Integer("Number of Copies", default=1)
-    is_label = fields.Boolean("Is Label")
 
     @api.constrains("data_source", "report_id", "attachment_domain")
     def _check_data_source(self):
@@ -65,8 +64,6 @@ class PrintingAuto(models.Model):
             return result
         if self.data_source == "report":
             return self.report_id.behaviour()
-        if self.is_label:
-            return {"printer": self.env.user.default_label_printer_id}
         return self.env["ir.actions.report"]._get_user_default_print_behaviour()
 
     def _get_record(self, record):

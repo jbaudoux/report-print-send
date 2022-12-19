@@ -1,1 +1,1 @@
-Base module to support automatic priting of a report or attachements.
+Base module to support automatic priting of a report or attachments.
