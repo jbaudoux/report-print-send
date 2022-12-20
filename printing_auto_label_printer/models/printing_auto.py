@@ -8,8 +8,6 @@ from odoo import fields, models
 class PrintingAuto(models.Model):
     _inherit = "printing.auto"
 
-    name = fields.Char(string="Name", required=True)
-
     is_label = fields.Boolean("Is Label")
 
     def _get_behaviour(self):

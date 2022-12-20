@@ -57,7 +57,6 @@ class IrActionsReport(models.Model):
         return serializable_result
 
     def _get_user_default_printer(self, user):
-        self.ensure_one()
         return user.printing_printer_id
 
     def _get_user_default_print_behaviour(self):

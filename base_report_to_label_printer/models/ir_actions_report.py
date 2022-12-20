@@ -11,6 +11,8 @@ class IrActionsReport(models.Model):
     label = fields.Boolean("Report is a Label")
 
     def _get_user_default_printer(self, user):
-        if self.label:
-            return user.default_label_printer_id
+        if self.exists():
+            self.ensure_one()
+            if self.label:
+                return user.default_label_printer_id
         return super()._get_user_default_printer(user)
