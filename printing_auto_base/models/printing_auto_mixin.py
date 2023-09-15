@@ -2,6 +2,7 @@
 # Copyright 2022 Michael Tietz (MT Software) <mtietz@mt-software.de>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 import logging
+from collections import defaultdict
 
 from odoo import _, fields, models
 
@@ -63,6 +64,17 @@ class PrintingAutoMixin(models.AbstractModel):
     def handle_print_auto(self):
         """Print some report or attachment directly to the corresponding printer."""
         self._on_printing_auto_start()
+        printed_records = defaultdict(list)
         for record in self:
             for printing_auto in record._get_printing_auto():
+                # The automatic printing is called once on each record.
+                # But if some printing config have a 'record_change' set, the printing may
+                # be called multple times for the same record.
+                # And we don't want that.
+                records_to_print = printing_auto._get_record(record)
+                if records_to_print:
+                    if records_to_print.ids in printed_records[printing_auto.name]:
+                        # Has already been printed
+                        continue
+                    printed_records[printing_auto.name].append(records_to_print.ids)
                 record._handle_print_auto(printing_auto)
