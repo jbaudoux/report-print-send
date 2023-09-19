@@ -107,7 +107,7 @@ class TestPrintingAutoBase(TestPrintingAutoCommon):
 
         """
         printing_auto = self._create_printing_auto_report(
-            vals={"record_change": "child_ids"}
+            vals={"record_change": "child_ids", "printer_id": self.printer_1.id}
         )
         child1 = self.env["printingauto.tester.child"].create({"name": "Child One"})
         child2 = self.env["printingauto.tester.child"].create({"name": "Child Two"})
@@ -126,22 +126,28 @@ class TestPrintingAutoBase(TestPrintingAutoCommon):
             }
         )
         parents = parent1 | parent2
-        do_print = (
+        generate_data_from = (
             "odoo.addons.printing_auto_base.models.printing_auto."
-            "PrintingAuto.do_print"
+            "PrintingAuto._generate_data_from_report"
         )
-        # Both parents have the same child only print the child report once
-        with mock.patch(do_print) as do_print_call:
+        with mock.patch(generate_data_from) as generate_data_from:
+            # Both parents have the same child only print the child report once
             parents.handle_print_auto()
-            do_print_call.assert_called_once()
-        # Both parents have different childs, print both child repors
-        parent2.child_ids = [(6, 0, child2.ids)]
-        with mock.patch(do_print) as do_print_call:
+            self.assertEqual(generate_data_from.call_count, 1)
+            generate_data_from.assert_called_with(child1)
+            generate_data_from.reset_mock()
+            # Both parents have different childs, print both child reports
+            parent2.child_ids = [(6, 0, child2.ids)]
             parents.handle_print_auto()
-            self.assertEqual(do_print_call.call_count, 2)
-        # THe parents have one child in common and one parent has a 2nd child
-        # FIXME ? child1 will be printed twice ?
-        parent2.child_ids = [(4, child1.id, 0)]
-        with mock.patch(do_print) as do_print_call:
+            self.assertEqual(generate_data_from.call_count, 2)
+            generate_data_from.assert_has_calls(
+                [mock.call(child1), mock.call(child2)], any_order=True
+            )
+            generate_data_from.reset_mock()
+            # THe parents have one child in common and one parent has a 2nd child
+            parent2.child_ids = [(4, child1.id, 0)]
             parents.handle_print_auto()
-            self.assertEqual(do_print_call.call_count, 2)
+            self.assertEqual(generate_data_from.call_count, 2)
+            generate_data_from.assert_has_calls(
+                [mock.call(child1), mock.call(child2)], any_order=True
+            )
